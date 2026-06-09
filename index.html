@@ -455,10 +455,29 @@ function confirm2(title, body, onConfirm) {
 // ══════════════════════════════════════════════════
 //  Event Binding
 // ══════════════════════════════════════════════════
+function doLogin(user) {
+  S.user = user;
+  S.loading = false;
+  S.isAdmin = user.email.toLowerCase() === CONFIG.adminEmail.toLowerCase();
+  if (S.isAdmin) {
+    S.isAllowed = true; S.tab = "slots";
+    render();
+    Promise.all([loadAll(), loadStudents()]).then(render).catch(function(e){ console.error(e); render(); });
+  } else {
+    isStudentAllowed(user.email).then(function(ok){
+      S.isAllowed = ok;
+      if (ok) { S.tab = "available"; render(); loadAll().then(render).catch(function(){ render(); }); }
+      else render();
+    }).catch(function(){ S.isAllowed = false; render(); });
+  }
+}
+
 function bindLogin() {
   var btn = document.getElementById("btn-google");
   if (btn) btn.onclick = function(){
-    auth.signInWithPopup(googleProvider).catch(function(e){ toast("로그인 실패: " + e.message); });
+    auth.signInWithPopup(googleProvider).then(function(result){
+      doLogin(result.user);
+    }).catch(function(e){ toast("로그인 실패: " + e.message); });
   };
 }
 
@@ -551,13 +570,14 @@ auth.onAuthStateChanged(function(user){
   S.isAdmin = user.email.toLowerCase() === CONFIG.adminEmail.toLowerCase();
   if (S.isAdmin) {
     S.isAllowed = true; S.tab = "slots";
-    Promise.all([loadAll(), loadStudents()]).then(render);
+    render();
+    Promise.all([loadAll(), loadStudents()]).then(render).catch(function(e){ console.error(e); toast("Firestore 오류: " + e.message); render(); });
   } else {
     isStudentAllowed(user.email).then(function(ok){
       S.isAllowed = ok;
-      if (ok) { S.tab="available"; loadAll().then(render); }
+      if (ok) { S.tab="available"; render(); loadAll().then(render).catch(function(e){ console.error(e); render(); }); }
       else render();
-    });
+    }).catch(function(e){ console.error(e); S.isAllowed=false; render(); });
   }
 });
 
