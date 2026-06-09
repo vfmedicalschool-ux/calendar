@@ -181,8 +181,9 @@ function bookingForSlot(slotId) {
 // ══════════════════════════════════════════════════
 function loadAll() {
   return Promise.all([
-    db.collection("slots").orderBy("date").orderBy("time").get().then(function(snap){
-      S.slots = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    db.collection("slots").get().then(function(snap){
+      S.slots = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+        .sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
     }),
     db.collection("bookings").where("status","==","active").get().then(function(snap){
       S.bookings = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
