@@ -180,16 +180,23 @@ function bookingForSlot(slotId) {
 //  Firestore CRUD
 // ══════════════════════════════════════════════════
 function loadAll() {
-  return Promise.all([
-    db.collection("slots").get().then(function(snap){
-      S.slots = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
-        .sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
-    }),
-    db.collection("bookings").where("status","==","active").get().then(function(snap){
+  var slotsP = db.collection("slots").get().then(function(snap){
+    S.slots = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); })
+      .sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
+  });
+  // 어드민: 전체 예약 로드 / 학생: 전체 예약 로드 (슬롯 마감 표시용) + 본인 예약 별도 저장
+  var bookingsP = db.collection("bookings").where("status","==","active").get().then(function(snap){
+    S.bookings = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
+    if (S.user) S.myBooking = S.bookings.find(function(b){ return b.studentEmail === S.user.email; }) || null;
+  }).catch(function(){
+    // 권한 부족 시 본인 예약만 따로 로드
+    if (!S.user) return;
+    return db.collection("bookings").where("status","==","active").where("studentEmail","==",S.user.email).get().then(function(snap){
       S.bookings = snap.docs.map(function(d){ return Object.assign({ id: d.id }, d.data()); });
-      if (S.user) S.myBooking = S.bookings.find(function(b){ return b.studentEmail === S.user.email; }) || null;
-    })
-  ]);
+      S.myBooking = S.bookings[0] || null;
+    });
+  });
+  return Promise.all([slotsP, bookingsP]);
 }
 
 function loadStudents() {
