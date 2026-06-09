@@ -263,12 +263,18 @@ function bookSlot(slot){
   if(bookingForSlot(slot.id)){toast("방금 다른 학생이 예약했어요. 다른 시간을 선택해주세요.");loadAll().then(render);return;}
   var student=S.students.find(function(s){return s.email===S.user.email;});
   var name=student?student.name:(S.user.displayName||"");
-  db.collection("bookings").add({slotId:slot.id,slotDate:slot.date,slotTime:slot.time,
-    studentEmail:S.user.email,studentName:name,status:"active",bookedAt:firebase.firestore.Timestamp.now()})
-    .then(function(){
+  var bookingData={slotId:slot.id,slotDate:slot.date,slotTime:slot.time,
+    studentEmail:S.user.email,studentName:name,status:"active",bookedAt:firebase.firestore.Timestamp.now()};
+  db.collection("bookings").add(bookingData)
+    .then(function(docRef){
+      // 즉시 반영 - loadAll 결과와 무관하게 내 예약 바로 세팅
+      var newBk=Object.assign({id:docRef.id},bookingData);
+      S.bookings.push(newBk);
+      S.myBooking=newBk;
       notifyKakao("📅 ["+CONFIG.brandName+"] 상담 예약 알림\n\n학생: "+name+"\n일정: "+fmtDate(slot.date)+" "+slot.time);
-      return loadAll();
-    }).then(function(){S.tab="mine";toast("예약 완료! 🎉");render();});
+      S.tab="mine";toast("예약 완료! 🎉");render();
+      loadAll().then(render); // 백그라운드에서 새로고침
+    }).catch(function(e){toast("예약 실패: "+e.message);});
 }
 function cancelBooking(id,isAdm){
   db.collection("bookings").doc(id).update({status:"cancelled"}).then(function(){return loadAll();})
@@ -285,7 +291,7 @@ function render(){
     +'<div class="wrap">'
     +(S.isAdmin?renderAdmin():renderStudent())
     +'</div>'
-    +(S.modalSlot?renderModalSlot():"")
+    +(S.isAdmin&&S.modalSlot?renderModalSlot():"")
     +(S.modalStudent?renderModalStudent():"")
     +(S.modalConfirm?renderModalConfirm():"");
   bindAll();
@@ -324,9 +330,9 @@ function renderCalendar(isAdmin){
   var firstDow=new Date(y,m,1).getDay();
 
   var html='<div class="cal-hdr">'
-    +'<button class="cal-nav" id="cal-prev">‹</button>'
+    +'<button class="cal-nav" id="cal-prev"'+(y===2026&&m<=5?' disabled style="opacity:.3;cursor:default"':'')+'>‹</button>'
     +'<div class="cal-title">'+y+'년 '+MONTHS[m]+'</div>'
-    +'<button class="cal-nav" id="cal-next">›</button>'
+    +'<button class="cal-nav" id="cal-next"'+(y===2026&&m>=6?' disabled style="opacity:.3;cursor:default"':'')+'>›</button>'
     +'</div>'
     +'<div class="cal-grid">';
 
@@ -371,7 +377,8 @@ function renderCalendar(isAdmin){
       }
     });
 
-    if(isAdmin&&!isPast){
+    var inRange=ds>="2026-06-25"&&ds<="2026-07-05";
+    if(isAdmin&&!isPast&&inRange){
       html+='<button class="cal-add-btn" data-add-date="'+ds+'">+</button>';
     }
     html+='</div>';
@@ -545,30 +552,29 @@ function bindAll(){
   var ovc=document.getElementById("overlay-confirm");
   if(ovc)ovc.onclick=function(e){if(e.target.id==="overlay-confirm"){S.modalConfirm=null;render();}};
 
-  // Cal nav
+  // Cal nav (6월~7월 2026 제한)
   var cp=document.getElementById("cal-prev");
-  if(cp)cp.onclick=function(){S.calMonth--;if(S.calMonth<0){S.calMonth=11;S.calYear--;}render();};
+  if(cp)cp.onclick=function(){if(S.calYear===2026&&S.calMonth<=5)return;S.calMonth--;if(S.calMonth<0){S.calMonth=11;S.calYear--;}render();};
   var cn=document.getElementById("cal-next");
-  if(cn)cn.onclick=function(){S.calMonth++;if(S.calMonth>11){S.calMonth=0;S.calYear++;}render();};
+  if(cn)cn.onclick=function(){if(S.calYear===2026&&S.calMonth>=6)return;S.calMonth++;if(S.calMonth>11){S.calMonth=0;S.calYear++;}render();};
 
-  // Admin: add slot by clicking "+" on a date
+  // 슬롯 추가·삭제 (관리자만 - UI에서도 isAdmin 체크로 버튼 안보임)
   document.querySelectorAll("[data-add-date]").forEach(function(el){
-    el.onclick=function(e){e.stopPropagation();S.preDate=el.dataset.addDate;S.modalSlot=true;render();};
+    el.onclick=function(e){e.stopPropagation();if(!S.isAdmin)return;S.preDate=el.dataset.addDate;S.modalSlot=true;render();};
   });
-  // Slot modal
   var bcs=document.getElementById("btn-close-slot-modal");
   if(bcs)bcs.onclick=function(){S.modalSlot=false;render();};
   var bdas=document.getElementById("btn-do-add-slot");
   if(bdas)bdas.onclick=function(){
+    if(!S.isAdmin)return;
     var date=document.getElementById("f-date").value;
     var time=document.getElementById("f-time").value;
     var meet=document.getElementById("f-meet").value;
     if(!date||!time){toast("날짜와 시간을 모두 입력해주세요.");return;}
     S.modalSlot=false;render();addSlot(date,time,meet);
   };
-  // Delete slot
   document.querySelectorAll("[data-del-slot]").forEach(function(el){
-    el.onclick=function(e){e.stopPropagation();confirm2("슬롯 삭제","이 슬롯을 삭제할까요?",function(){delSlot(el.dataset.delSlot);});};
+    el.onclick=function(e){e.stopPropagation();if(!S.isAdmin)return;confirm2("슬롯 삭제","이 슬롯을 삭제할까요?",function(){delSlot(el.dataset.delSlot);});};
   });
 
   // Student modal
