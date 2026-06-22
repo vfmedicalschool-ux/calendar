@@ -254,8 +254,13 @@ function addSlot(date,time,meetLink){
     .catch(function(e){toast("저장 실패: "+e.message);render();});
 }
 function delSlot(id){
-  if(bookingForSlot(id)){toast("예약된 슬롯은 삭제할 수 없어요.");return;}
-  db.collection("slots").doc(id).delete().then(function(){return loadAll();}).then(function(){toast("삭제됐어요.");render();});
+  var bk=bookingForSlot(id);
+  var tasks=[db.collection("slots").doc(id).delete()];
+  // 예약이 있으면 함께 취소 처리
+  if(bk) tasks.push(db.collection("bookings").doc(bk.id).update({status:"cancelled"}));
+  Promise.all(tasks).then(function(){return loadAll();}).then(function(){
+    toast(bk?"슬롯과 예약이 함께 삭제됐어요.":"삭제됐어요.");render();
+  }).catch(function(e){toast("삭제 실패: "+e.message);});
 }
 function addStudent(name,email){
   email=email.toLowerCase();
