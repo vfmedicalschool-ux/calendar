@@ -254,13 +254,14 @@ function addSlot(date,time,meetLink){
     .catch(function(e){toast("저장 실패: "+e.message);render();});
 }
 function delSlot(id){
-  var bk=bookingForSlot(id);
-  var tasks=[db.collection("slots").doc(id).delete()];
-  // 예약이 있으면 함께 취소 처리
-  if(bk) tasks.push(db.collection("bookings").doc(bk.id).update({status:"cancelled"}));
-  Promise.all(tasks).then(function(){return loadAll();}).then(function(){
-    toast(bk?"슬롯과 예약이 함께 삭제됐어요.":"삭제됐어요.");render();
-  }).catch(function(e){toast("삭제 실패: "+e.message);});
+  db.collection("slots").doc(id).delete()
+    .then(function(){return loadAll();}).then(function(){toast("슬롯이 삭제됐어요.");render();})
+    .catch(function(e){toast("삭제 실패: "+e.message);});
+}
+function cancelBookingKeepSlot(bookingId){
+  db.collection("bookings").doc(bookingId).update({status:"cancelled"})
+    .then(function(){return loadAll();}).then(function(){toast("예약이 취소됐어요. 슬롯은 예약 가능 상태로 유지돼요.");render();})
+    .catch(function(e){toast("취소 실패: "+e.message);});
 }
 function addStudent(name,email){
   email=email.toLowerCase();
@@ -303,6 +304,7 @@ function render(){
     +'<div class="wrap">'
     +(S.isAdmin?renderAdmin():renderStudent())
     +'</div>'
+    +'<div style="text-align:center;padding:16px 0 4px;font-size:11px;color:var(--muted);opacity:.55">v 1.1_Jun2026</div>'
     +(S.isAdmin&&S.modalSlot?renderModalSlot():"")
     +(S.modalStudent?renderModalStudent():"")
     +(S.modalConfirm?renderModalConfirm():"");
@@ -376,7 +378,9 @@ function renderCalendar(isAdmin){
         var cc=bk?"slot-chip chip-admin booked":"slot-chip chip-admin";
         html+='<div class="'+cc+'" style="cursor:default">'
           +'<span>'+slot.time+(bk?' · '+(bk.studentName||'예약됨'):'')+'</span>'
-          +'<button class="chip-del" data-del-slot="'+slot.id+'">×</button>'
+          +(bk
+            ?'<button class="chip-del" data-cancel-bk="'+bk.id+'">×</button>'
+            :'<button class="chip-del" data-del-slot="'+slot.id+'">×</button>')
           +'</div>';
       } else {
         if(isMe){
@@ -591,6 +595,9 @@ function bindAll(){
   };
   document.querySelectorAll("[data-del-slot]").forEach(function(el){
     el.onclick=function(e){e.stopPropagation();if(!S.isAdmin)return;confirm2("슬롯 삭제","이 슬롯을 삭제할까요?",function(){delSlot(el.dataset.delSlot);});};
+  });
+  document.querySelectorAll("[data-cancel-bk]").forEach(function(el){
+    el.onclick=function(e){e.stopPropagation();if(!S.isAdmin)return;confirm2("예약 취소","이 예약을 취소할까요?<br>슬롯은 예약 가능 상태로 유지돼요.",function(){cancelBookingKeepSlot(el.dataset.cancelBk);});};
   });
 
   // Student modal
