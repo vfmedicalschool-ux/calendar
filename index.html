@@ -546,6 +546,22 @@ function renderModalConfirm(){
 function confirm2(title,body,fn){S.modalConfirm={title:title,body:body,onConfirm:fn};render();}
 
 // ── Events ─────────────────────────────────────────────
+// iOS/모바일 감지
+function isIOS(){
+  return /iPhone|iPad|iPod/i.test(navigator.userAgent)||
+    (/Macintosh/i.test(navigator.userAgent)&&navigator.maxTouchPoints>1);
+}
+function isMobile(){
+  return isIOS()||/Android/i.test(navigator.userAgent);
+}
+
+// 페이지 로드 시 redirect 결과 처리 (iOS용)
+auth.getRedirectResult().then(function(result){
+  if(result&&result.user) doLogin(result.user);
+}).catch(function(e){
+  if(e.code!=='auth/no-auth-event') console.warn('redirect result:', e.message);
+});
+
 function doLogin(user){
   S.user=user;S.loading=false;
   S.isAdmin=user.email.toLowerCase()===CONFIG.adminEmail.toLowerCase();
@@ -562,7 +578,15 @@ function doLogin(user){
 }
 function bindLogin(){
   var btn=document.getElementById("btn-google");
-  if(btn)btn.onclick=function(){auth.signInWithPopup(gProvider).then(function(r){doLogin(r.user);}).catch(function(e){toast("로그인 실패: "+e.message);});};
+  if(btn)btn.onclick=function(){
+    if(isMobile()){
+      // iOS/안드로이드: 리다이렉트 방식
+      auth.signInWithRedirect(gProvider).catch(function(e){toast("로그인 실패: "+e.message);});
+    } else {
+      // 데스크탑: 팝업 방식
+      auth.signInWithPopup(gProvider).then(function(r){doLogin(r.user);}).catch(function(e){toast("로그인 실패: "+e.message);});
+    }
+  };
 }
 function bindLogout(){var btn=document.getElementById("btn-logout");if(btn)btn.onclick=function(){auth.signOut();};}
 
