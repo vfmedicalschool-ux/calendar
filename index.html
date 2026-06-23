@@ -217,7 +217,15 @@ function toast(msg){var el=document.getElementById("toast");el.textContent=msg;e
 
 function notifyKakao(msg){if(!CONFIG.kakaoWebhook)return;fetch(CONFIG.kakaoWebhook,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({text:msg})}).catch(function(){});}
 
-function bookingForSlot(slotId){return S.bookings.find(function(b){return b.slotId===slotId;})||null;}
+function bookingForSlot(slotId){
+  // 슬롯 자체의 bookedByEmail 필드 우선 확인 (실시간 중복 방지)
+  var slot=S.slots.find(function(s){return s.id===slotId;});
+  if(slot&&slot.bookedByEmail){
+    var bk=S.bookings.find(function(b){return b.slotId===slotId;});
+    return bk||{slotId:slotId,studentEmail:slot.bookedByEmail,studentName:slot.bookedByName||"예약됨",id:null};
+  }
+  return S.bookings.find(function(b){return b.slotId===slotId;})||null;
+}
 
 // ── Firestore ──────────────────────────────────────────
 function loadAll(){
@@ -259,8 +267,14 @@ function delSlot(id){
     .catch(function(e){toast("삭제 실패: "+e.message);});
 }
 function cancelBookingKeepSlot(bookingId){
-  db.collection("bookings").doc(bookingId).update({status:"cancelled"})
-    .then(function(){return loadAll();}).then(function(){toast("예약이 취소됐어요. 슬롯은 예약 가능 상태로 유지돼요.");render();})
+  var bk=S.bookings.find(function(b){return b.id===bookingId;});
+  var batch=db.batch();
+  batch.update(db.collection("bookings").doc(bookingId),{status:"cancelled"});
+  if(bk&&bk.slotId){
+    batch.update(db.collection("slots").doc(bk.slotId),{bookedByEmail:null,bookedByName:null});
+  }
+  batch.commit().then(function(){return loadAll();})
+    .then(function(){toast("예약이 취소됐어요. 슬롯은 예약 가능 상태로 유지돼요.");render();})
     .catch(function(e){toast("취소 실패: "+e.message);});
 }
 function addStudent(name,email){
@@ -278,19 +292,31 @@ function bookSlot(slot){
   var name=student?student.name:(S.user.displayName||"");
   var bookingData={slotId:slot.id,slotDate:slot.date,slotTime:slot.time,
     studentEmail:S.user.email,studentName:name,status:"active",bookedAt:firebase.firestore.Timestamp.now()};
-  db.collection("bookings").add(bookingData)
-    .then(function(docRef){
-      // 즉시 반영 - loadAll 결과와 무관하게 내 예약 바로 세팅
-      var newBk=Object.assign({id:docRef.id},bookingData);
-      S.bookings.push(newBk);
-      S.myBooking=newBk;
-      notifyKakao("📅 ["+CONFIG.brandName+"] 상담 예약 알림\n\n학생: "+name+"\n일정: "+fmtDate(slot.date)+" "+slot.time);
-      S.tab="mine";toast("예약 완료! 🎉");render();
-      loadAll().then(render); // 백그라운드에서 새로고침
-    }).catch(function(e){toast("예약 실패: "+e.message);});
+  var batch=db.batch();
+  var bookingRef=db.collection("bookings").doc();
+  var slotRef=db.collection("slots").doc(slot.id);
+  batch.set(bookingRef,bookingData);
+  batch.update(slotRef,{bookedByEmail:S.user.email,bookedByName:name}); // 슬롯에 직접 표시
+  batch.commit().then(function(){
+    var newBk=Object.assign({id:bookingRef.id},bookingData);
+    S.bookings.push(newBk);
+    S.myBooking=newBk;
+    // 슬롯 로컬 업데이트
+    var s=S.slots.find(function(x){return x.id===slot.id;});
+    if(s){s.bookedByEmail=S.user.email;s.bookedByName=name;}
+    notifyKakao("📅 ["+CONFIG.brandName+"] 상담 예약 알림\n\n학생: "+name+"\n일정: "+fmtDate(slot.date)+" "+slot.time);
+    S.tab="mine";toast("예약 완료! 🎉");render();
+    loadAll().then(render);
+  }).catch(function(e){toast("예약 실패: "+e.message);});
 }
 function cancelBooking(id,isAdm){
-  db.collection("bookings").doc(id).update({status:"cancelled"}).then(function(){return loadAll();})
+  var bk=S.bookings.find(function(b){return b.id===id;})||S.myBooking;
+  var batch=db.batch();
+  batch.update(db.collection("bookings").doc(id),{status:"cancelled"});
+  if(bk&&bk.slotId){
+    batch.update(db.collection("slots").doc(bk.slotId),{bookedByEmail:null,bookedByName:null});
+  }
+  batch.commit().then(function(){return loadAll();})
     .then(function(){toast("예약이 취소됐어요.");if(!isAdm)S.tab="cal";render();})
     .catch(function(e){toast("취소 실패: "+e.message);});
 }
