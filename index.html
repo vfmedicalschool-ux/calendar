@@ -291,7 +291,8 @@ function bookSlot(slot){
 }
 function cancelBooking(id,isAdm){
   db.collection("bookings").doc(id).update({status:"cancelled"}).then(function(){return loadAll();})
-    .then(function(){toast("예약이 취소됐어요.");if(!isAdm)S.tab="cal";render();});
+    .then(function(){toast("예약이 취소됐어요.");if(!isAdm)S.tab="cal";render();})
+    .catch(function(e){toast("취소 실패: "+e.message);});
 }
 
 // ── Render ─────────────────────────────────────────────
@@ -461,7 +462,7 @@ function renderAdminBookings(){
         return '<div class="lrow"><div><div class="rn">'+( b.studentName||"(이름 없음)")+'</div>'
           +'<div class="rs">'+b.studentEmail+'</div>'
           +'<div style="font-size:13px;color:var(--blue);margin-top:2px">'+fmtDate(b.slotDate)+' '+b.slotTime+'</div>'
-          +(slot&&slot.meetLink?'<a href="'+slot.meetLink+'" target="_blank" style="font-size:13px">📹 Meet 링크</a>':"")+
+          +(slot&&slot.meetLink?'<a href="'+slot.meetLink+'" target="_blank" style="font-size:13px">📹 Meet 링크</a>':"")
           +'</div><button class="btn btn-danger btn-sm" data-cancel-booking="'+b.id+'">취소</button></div>';
       }).join(""))
     +'</div>';
