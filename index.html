@@ -199,7 +199,7 @@ var now=new Date();
 var S={
   user:null,isAdmin:false,isAllowed:false,loading:true,
   tab:"cal",
-  slots:[],students:[],bookings:[],myBooking:null,cancelCount:0,
+  slots:[],students:[],bookings:[],myBooking:null,cancelCount:0,myName:"",
   calYear:now.getFullYear(),calMonth:now.getMonth(),
   modalSlot:false,modalStudent:false,modalConfirm:null,
   preDate:""
@@ -253,7 +253,12 @@ function loadAll(){
   return Promise.all([sP,bP,cP]);
 }
 function loadStudents(){return db.collection("students").orderBy("name").get().then(function(snap){S.students=snap.docs.map(function(d){return Object.assign({id:d.id},d.data());});});}
-function isStudentAllowed(email){return db.collection("students").doc(email.toLowerCase()).get().then(function(s){return s.exists;});}
+function isStudentAllowed(email){
+  return db.collection("students").doc(email.toLowerCase()).get().then(function(snap){
+    if(snap.exists){ S.myName=snap.data().name||""; return true; }
+    return false;
+  });
+}
 
 function addSlot(date,time,meetLink){
   if(S.slots.some(function(s){return s.date===date&&s.time===time;})){toast("같은 날짜·시간의 슬롯이 이미 있어요.");return Promise.resolve();}
@@ -289,7 +294,7 @@ function bookSlot(slot){
   if(S.myBooking){toast("이미 예약된 상담이 있어요.");return;}
   if(bookingForSlot(slot.id)){toast("방금 다른 학생이 예약했어요. 다른 시간을 선택해주세요.");loadAll().then(render);return;}
   var student=S.students.find(function(s){return s.email===S.user.email;});
-  var name=student?student.name:(S.user.displayName||"");
+  var name=student?student.name:(S.myName||S.user.displayName||"");
   var bookingData={slotId:slot.id,slotDate:slot.date,slotTime:slot.time,
     studentEmail:S.user.email,studentName:name,status:"active",bookedAt:firebase.firestore.Timestamp.now()};
   var batch=db.batch();
