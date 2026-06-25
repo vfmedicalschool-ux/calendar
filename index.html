@@ -412,7 +412,7 @@ function renderCalendar(isAdmin){
       if(isAdmin){
         var cc=bk?"slot-chip chip-admin booked":"slot-chip chip-admin";
         html+='<div class="'+cc+'" style="cursor:default">'
-          +'<span>'+slot.time+(bk?' · '+(bk.studentName||'예약됨'):'')+'</span>'
+          +'<span style="font-size:11px">'+slot.time+(bk?' · '+(bk.studentName||bk.studentEmail||'예약됨')+'<br><span style="opacity:.65;font-size:10px">'+bk.studentEmail+'</span>':'')+'</span>'
           +(bk
             ?'<button class="chip-del" data-cancel-bk="'+bk.id+'">×</button>'
             :'<button class="chip-del" data-del-slot="'+slot.id+'">×</button>')
@@ -610,12 +610,22 @@ function doLogin(user){
 function bindLogin(){
   var btn=document.getElementById("btn-google");
   if(btn)btn.onclick=function(){
-    if(isMobile()){
-      // iOS/안드로이드: 리다이렉트 방식
+    if(isIOS()){
+      // iOS Safari: 리다이렉트 방식
       auth.signInWithRedirect(gProvider).catch(function(e){toast("로그인 실패: "+e.message);});
     } else {
-      // 데스크탑: 팝업 방식
-      auth.signInWithPopup(gProvider).then(function(r){doLogin(r.user);}).catch(function(e){toast("로그인 실패: "+e.message);});
+      // 안드로이드 Chrome + 데스크탑: 팝업 방식
+      auth.signInWithPopup(gProvider).then(function(r){
+        doLogin(r.user);
+      }).catch(function(e){
+        if(e.code==='auth/popup-blocked'||e.code==='auth/popup-closed-by-user'||e.code==='auth/cancelled-popup-request'){
+          // 팝업 차단 시 자동으로 리다이렉트 방식으로 전환
+          toast("팝업이 차단됐어요. 잠시 후 이동합니다...");
+          setTimeout(function(){ auth.signInWithRedirect(gProvider); }, 1000);
+        } else {
+          toast("로그인 실패: "+e.message);
+        }
+      });
     }
   };
 }
