@@ -412,7 +412,7 @@ function renderCalendar(isAdmin){
       if(isAdmin){
         var cc=bk?"slot-chip chip-admin booked":"slot-chip chip-admin";
         html+='<div class="'+cc+'" style="cursor:default">'
-          +'<span style="font-size:11px">'+slot.time+(bk?' · '+(bk.studentName||bk.studentEmail||'예약됨')+'<br><span style="opacity:.65;font-size:10px">'+bk.studentEmail+'</span>':'')+'</span>'
+          +'<span style="font-size:11px">'+slot.time+(bk?' · '+(bk.studentName||bk.studentEmail||'예약됨'):'')+'</span>'
           +(bk
             ?'<button class="chip-del" data-cancel-bk="'+bk.id+'">×</button>'
             :'<button class="chip-del" data-del-slot="'+slot.id+'">×</button>')
