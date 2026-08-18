@@ -200,7 +200,7 @@ var S={
   user:null,isAdmin:false,isAllowed:false,loading:true,
   tab:"cal",
   slots:[],students:[],bookings:[],myBooking:null,cancelCount:0,myName:"",
-  calYear:now.getFullYear(),calMonth:now.getMonth(),
+  calYear:2026,calMonth:7,
   modalSlot:false,modalStudent:false,modalConfirm:null,
   preDate:""
 };
@@ -381,9 +381,9 @@ function renderCalendar(isAdmin){
   var firstDow=new Date(y,m,1).getDay();
 
   var html='<div class="cal-hdr">'
-    +'<button class="cal-nav" id="cal-prev"'+(y===2026&&m<=5?' disabled style="opacity:.3;cursor:default"':'')+'>‹</button>'
+    +'<button class="cal-nav" id="cal-prev"'+(y===2026&&m<=7?' disabled style="opacity:.3;cursor:default"':'')+'>‹</button>'
     +'<div class="cal-title">'+y+'년 '+MONTHS[m]+'</div>'
-    +'<button class="cal-nav" id="cal-next"'+(y===2026&&m>=6?' disabled style="opacity:.3;cursor:default"':'')+'>›</button>'
+    +'<button class="cal-nav" id="cal-next"'+(y===2026&&m>=8?' disabled style="opacity:.3;cursor:default"':'')+'>›</button>'
     +'</div>'
     +'<div class="cal-grid">';
 
@@ -430,7 +430,7 @@ function renderCalendar(isAdmin){
       }
     });
 
-    var inRange=ds>="2026-06-25"&&ds<="2026-07-05";
+    var inRange=ds>="2026-08-25"&&ds<="2026-08-31";
     if(isAdmin&&!isPast&&inRange){
       html+='<button class="cal-add-btn" data-add-date="'+ds+'">+</button>';
     }
@@ -643,9 +643,9 @@ function bindAll(){
 
   // Cal nav (6월~7월 2026 제한)
   var cp=document.getElementById("cal-prev");
-  if(cp)cp.onclick=function(){if(S.calYear===2026&&S.calMonth<=5)return;S.calMonth--;if(S.calMonth<0){S.calMonth=11;S.calYear--;}render();};
+  if(cp)cp.onclick=function(){if(S.calYear===2026&&S.calMonth<=7)return;S.calMonth--;if(S.calMonth<0){S.calMonth=11;S.calYear--;}render();};
   var cn=document.getElementById("cal-next");
-  if(cn)cn.onclick=function(){if(S.calYear===2026&&S.calMonth>=6)return;S.calMonth++;if(S.calMonth>11){S.calMonth=0;S.calYear++;}render();};
+  if(cn)cn.onclick=function(){if(S.calYear===2026&&S.calMonth>=8)return;S.calMonth++;if(S.calMonth>11){S.calMonth=0;S.calYear++;}render();};
 
   // 슬롯 추가·삭제 (관리자만 - UI에서도 isAdmin 체크로 버튼 안보임)
   document.querySelectorAll("[data-add-date]").forEach(function(el){
